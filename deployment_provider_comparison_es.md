@@ -112,16 +112,28 @@ Como parte del proceso de investigación, se identificaron tres riesgos técnico
 
 ---
 
-## 8. Conclusión y Recomendaciones de Arquitectura
+## 8. Decisión Arquitectónica y Matriz de Justificación
 
-1. **Opción Principal:** **Hugging Face Inference Endpoints**
-   - Proporciona latencia óptima en caliente (**141.6 ms promedio** vs **722.2 ms de red en Replicate**).
-   - Registró un **100% de tasa de éxito en 3,175 documentos continuos sin bloqueos**.
-   - Permite presupuestos de costo fijo en producción ($432/mes para una instancia T4).
-   - La compatibilidad nativa con contenedores OCI se alinea perfectamente con la arquitectura del servicio FastAPI del Milestone M2.
+Tras evaluar el rendimiento empírico, la previsibilidad de costos, la seguridad y la portabilidad de contenedores, se adopta formalmente la siguiente **decisión de arquitectura de infraestructura**:
 
-2. **Opción Fallback (Respaldo):** **Replicate**
-   - Sirve como un proveedor secundario para tareas masivas asíncronas de backfill, sujeto a empaquetamiento previo con `Cog` y registro de un método de pago.
+### 🎯 Decisión Formal
+
+* **Proveedor Candidato Elegido para Producción:** **Hugging Face Inference Endpoints**
+* **Proveedor Designado para Respaldo (Fallback):** **Replicate**
+
+### 📋 Matriz de Justificación de la Decisión
+
+1. **Rendimiento de Latencia Superior (141.6 ms):**  
+   Hugging Face demostró una latencia de inferencia en caliente de **141.6 ms por documento**, superando a Replicate tanto en su arquitectura de red remota (**722.2 ms**) como en la ejecución de contenedor Cog (**195.2 ms**).
+
+2. **Fiabilidad e Inmunidad a Bloqueos de Facturación:**  
+   Hugging Face registró una **tasa de éxito del 100% sobre 3,175 ejecuciones continuas** sin throttling ni bloqueos de cuota. Replicate rechazó llamadas en la nube (`HTTP 402/422`) al requerir tarjetas de crédito registradas.
+
+3. **Presupuesto Fijo Predecible ($432 USD/mes):**  
+   Para la ingesta esperada de producción (~50,000 docs/día), Hugging Face ofrece un esquema de costo fijo ($432/mes en nodo dedicado T4 24/7) que elimina la incertidumbre de la facturación por segundo en picos de demanda.
+
+4. **Compatibilidad Nativa con Estándares OCI / Docker:**  
+   Hugging Face no impone frameworks cerrados. El servicio de extracción se desplegará como un contenedor Docker genérico, garantizando portabilidad absoluta hacia la infraestructura futura de AWS o GCP en el Hito M2.
 
 ---
 
