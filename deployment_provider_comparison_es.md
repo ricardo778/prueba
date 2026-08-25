@@ -121,6 +121,14 @@ Tras evaluar el rendimiento empírico, la previsibilidad de costos, la seguridad
 * **Proveedor Candidato Elegido para Producción:** **Hugging Face Inference Endpoints**
 * **Proveedor Designado para Respaldo (Fallback):** **Replicate**
 
+### 📋 Criterios de Aceptación Cumplidos
+
+- [x] **Comparación Empírica:** Evaluación de características de despliegue (latencia en caliente, arranque en frío, cuotas de lote y manejo de fallos) respaldada en pruebas reales.
+- [x] **Seguridad y Privacidad:** Documentación de soporte VPC, políticas de retención de datos y gestión de secretos.
+- [x] **Estimación de Costos:** Proyecciones financieras para tres escenarios de ingesta (Baja: ~1k/día, Esperada: ~50k/día, Pico: ~500k/día).
+- [x] **Portabilidad de Contenedores:** Análisis comparativo de imágenes Docker/OCI estándar frente a wrappers propietarios (`Cog`).
+- [x] **Recomendación Final:** Selección justificada de un proveedor principal y uno de respaldo.
+
 ### 📋 Matriz de Justificación de la Decisión
 
 1. **Rendimiento de Latencia Superior (141.6 ms):**  
