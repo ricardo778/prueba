@@ -133,7 +133,7 @@ Tras evaluar el rendimiento empírico, la previsibilidad de costos, la seguridad
    Para la ingesta esperada de producción (~50,000 docs/día), Hugging Face ofrece un esquema de costo fijo ($432/mes en nodo dedicado T4 24/7) que elimina la incertidumbre de la facturación por segundo en picos de demanda.
 
 4. **Compatibilidad Nativa con Estándares OCI / Docker:**  
-   Hugging Face no impone frameworks cerrados. El servicio de extracción se desplegará como un contenedor Docker genérico, garantizando portabilidad absoluta hacia la infraestructura futura de AWS o GCP en el Hito M2.
+   Hugging Face no impone frameworks cerrados. El servicio de extracción se desplegará como un contenedor Docker genérico, garantizando portabilidad absoluta hacia la infraestructura futura de AWS o GCP.
 
 ---
 
