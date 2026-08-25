@@ -7,18 +7,11 @@
 
 ---
 
-## 1. Resumen Ejecutivo y Marco Teórico de Investigación
+## 1. Resumen Ejecutivo
 
 Este documento proporciona una evaluación comparativa profunda de los proveedores de alojamiento para el servicio externo de extracción multilingüe de entidades de grafo (`HUMakerGraphExtractor`). El objetivo principal es seleccionar el proveedor de despliegue óptimo que satisfaga nuestros requisitos de latencia, costo, seguridad y portabilidad de contenedores sin acoplar nuestro contrato de servicio API a un proveedor específico.
 
-### Fundamentos de Investigación: Extracción Semántica NER vs. LLMs Generativos
-
-La arquitectura del microservicio `HUMakerGraphExtractor` se basa en la tarea de Reconocimiento de Entidades Nombradas de Cero Disparos (*Zero-Shot Named Entity Recognition*). A diferencia de los modelos generativos del lenguaje (LLMs como Llama-3 o GPT-4), que requieren decodificación autorregresiva token por token e imponen latencias superiores a 1,500 ms por consulta, el modelo seleccionado **`urchade/gliner_multi-v2.1`** utiliza un codificador de representaciones bidireccionales (*Span-based Transformer Encoder*).
-
-Esta arquitectura basada en extracción de fragmentos (*span extraction*) permite:
-1. **Inferencia determinista en una sola pasada (*Single-forward pass*):** El modelo evalúa simultáneamente todas las combinaciones de fragmentos de texto y las etiquetas objetivo, eliminando la latencia de decodificación autorregresiva.
-2. **Alta eficiencia de cómputo GPU:** Procesa ventanas de contexto multilingüe en menos de **150 ms** manteniendo una precisión F1 de **0.89** sobre la verdad de terreno del proyecto.
-3. **Ausencia de sobrecarga de Prompt-Engineering:** Las etiquetas de búsqueda (`person`, `organization`, `software`, `technology`, `architecture`) se inyectan como incrustaciones semánticas (*embeddings*) directamente en la capa de atención cruzada.
+La evaluación combina análisis teóricos de arquitectura de nube con **datos empíricos medidos cuantitativamente** sobre el corpus multilingüe de evaluación del proyecto.
 
 ### Recomendación de Resumen
 
@@ -41,16 +34,6 @@ La siguiente tabla compara los resultados medidos empíricamente sobre la API re
 | **Gestión de Secretos** | Tokens de acceso de usuario de HF finos (Scopes) | Tokens de API a nivel de cuenta | Ambos se integran fácilmente con sistemas de gestión de secretos (ej. AWS Secrets Manager). |
 | **Portabilidad de Contenedores** | Estándares OCI / Docker nativos | Requiere envoltorio de contenedor `Cog` | Los despliegues en Hugging Face se traducen directamente a imágenes Docker genéricas para AWS ECS/EKS. |
 
-### Análisis de Investigación sobre Transporte HTTP y Overhead de Red
-
-Durante el benchmarking de infraestructura, se analizó el impacto del protocolo de comunicación en la latencia perceived por el cliente:
-
-$$\text{Latencia Total} = T_{\text{DNS}} + T_{\text{TLS Handshake}} + T_{\text{Cola Servidor}} + T_{\text{Inferencia GPU}} + T_{\text{Transferencia Payload}}$$
-
-En Hugging Face, la reutilización de conexiones de red mediante HTTP/2 y conexiones TCP persistentes (*Keep-Alive*) reduce el término $T_{\text{TLS Handshake}}$ a 0 ms tras la primera petición, haciendo que la latencia total coincida de forma óptima con $T_{\text{Inferencia GPU}} \approx 125 \text{ ms}$. 
-
-Por el contrario, la arquitectura serverless de Replicate en la nube introduce un $T_{\text{Cola Servidor}}$ y un enrutamiento por proxies intermedios para validar la facturación, añadiendo un overhead de red acumulado que eleva la latencia media percibida a **722.2 ms**.
-
 ---
 
 ## 3. Metodología de Medición Empírica y Auditoría de Datos
@@ -60,17 +43,14 @@ Para garantizar la validez científica y el rigor técnico de esta investigació
 1. **Evaluación de Hugging Face API:**
    * Registra las respuestas enviadas por la API de Hugging Face sobre **3,175 fragmentos del corpus**.
    * Demuestra un 100% de disponibilidad con una latencia promedio de **141.6 ms** y una desviación estándar de 68.3 ms.
-   * **Distribución de Latencias:** Median (p50): **125.2 ms** | Percentil 75 (p75): **137.2 ms** | Percentil 99 (p99): **1,536.4 ms** (arranque inicial).
 
 2. **Evaluación de Replicate Nube API:**
    * Registra los 50 intentos de transmisión remota por HTTP hacia los servidores en la nube de Replicate.
    * Evidencia un tiempo medio de viaje de red de **722.2 ms** y la respuesta oficial de bloqueo por falta de método de pago (`HTTP 402/422`).
-   * **Distribución de Latencias:** Mínimo: **377.1 ms** | Mediana: **710.4 ms** | Máximo: **1,544.5 ms**.
 
 3. **Evaluación de Replicate Cog Local:**
    * Registra la ejecución de la arquitectura de contenedor `Cog` de Replicate ejecutada en entorno aislado local sobre 50 muestras.
    * Registró una latencia interna promedio de **195.2 ms** con un 100% de extracción exitosa de entidades.
-   * **Distribución de Latencias:** Mínimo: **146.5 ms** | Mediana: **186.2 ms** | Máximo: **466.1 ms**.
 
 ---
 
@@ -97,18 +77,13 @@ Las siguientes proyecciones de costos comparan el alojamiento dedicado continuo 
 * **Replicate (Ejecución por segundo):** **~$1,500 – $2,200 / mes**
 * **Veredicto:** El escalado en Hugging Face se vuelve significativamente más rentable a medida que el volumen aumenta y el cómputo se vuelve continuo.
 
-### Eficiencia de Cómputo VRAM y Utilización de Hardware
-
-El modelo `urchade/gliner_multi-v2.1` requiere aproximadamente **1.8 GB de memoria VRAM** en precisión FP16 para cargar sus pesos y gestionar la ventana de contexto. En una GPU NVIDIA T4 de 16 GB VRAM disponible en Hugging Face Endpoints, la utilización de memoria se mantiene al **11.25%**, lo que deja un margen suficiente para procesar peticiones concurrentes mediante hilos paralelos sin sobrecargar la capacidad del hardware.
-
 ---
 
 ## 5. Arquitectura de Red, Seguridad y Aislamiento
 
 1. **Aislamiento de Red:** Hugging Face Inference Endpoints soporta AWS VPC Peering y GCP Private Service Connect, aislando las peticiones de extracción dentro de nuestro perímetro de red privada sin exponer tráfico por internet público.
-2. **Cifrado en Tránsito y Reposo:** Todo el tráfico entre la aplicación cliente y la infraestructura de inferencia se cifra obligatoriamente mediante TLS 1.3. Los pesos del modelo y los tokens de autenticación se almacenan en repositorios cifrados en reposo (AES-256).
-3. **Retención de Datos:** Ninguno de los proveedores utiliza los payloads de inferencia para reentrenamiento de modelos cuando se utilizan endpoints privados o dedicados.
-4. **Gestión de Secretos:** Los pesos del modelo y las claves API se almacenan utilizando variables de entorno cifradas inyectadas en tiempo de ejecución del contenedor.
+2. **Retención de Datos:** Ninguno de los proveedores utiliza los payloads de inferencia para reentrenamiento de modelos cuando se utilizan endpoints privados o dedicados.
+3. **Gestión de Secretos:** Los pesos del modelo y las claves API se almacenan utilizando variables de entorno cifradas inyectadas en tiempo de ejecución del contenedor.
 
 ---
 
@@ -147,3 +122,15 @@ Como parte del proceso de investigación, se identificaron tres riesgos técnico
 
 2. **Opción Fallback (Respaldo):** **Replicate**
    - Sirve como un proveedor secundario para tareas masivas asíncronas de backfill, sujeto a empaquetamiento previo con `Cog` y registro de un método de pago.
+
+---
+
+## 9. Glosario de Términos
+
+* **Arranque en Frío (*Cold Start*):** El tiempo inicial que requiere la plataforma en la nube para aprovisionar recursos, descargar la imagen del contenedor y cargar los pesos del modelo en la memoria GPU tras un período de inactividad.
+* **Latencia en Caliente (*Warm Latency*):** El tiempo de respuesta de inferencia obtenido cuando el servidor GPU y el modelo ya se encuentran cargados en memoria y listos para atender peticiones.
+* **Cog:** Herramienta de código abierto desarrollada por Replicate para empaquetar modelos de Machine Learning en contenedores estandarizados de producción.
+* **Inference Endpoints:** Servicio gestionado en la nube que permite desplegar modelos de aprendizaje automático en infraestructura dedicada con aceleración GPU.
+* **Throughput (Rendimiento):** La cantidad de solicitudes o fragmentos de texto que el sistema puede procesar por unidad de tiempo (medido en documentos por segundo).
+* **VPC Peering (Conexión de Red Privada Virtual):** Conexión privada directa entre dos redes virtuales en la nube que permite transferir datos de forma aislada sin pasar por el internet público.
+* **OCI (Open Container Initiative):** Estándar abierto de la industria de software para el formato de imágenes y tiempo de ejecución de contenedores (adoptado por Docker y Kubernetes).
